@@ -3,21 +3,40 @@ from os import path
 from collections.abc import Iterable
 import cfbd
 
-from api import create_api_client
+from api import create_play_client
 from util import game_time_to_timestamp, read_file, write_file
 
-PLAY_DIR = "plays"
+PLAY_DIR = path.join(path.dirname(__file__), "plays")
+
+WEEKS = range(1, 14)
 
 
-def get_file_name(year: int = 2023) -> str:
-    return path.join(PLAY_DIR, f"{year}.pq")
+def get_file_name(year: int, week: int) -> str:
+    return path.join(PLAY_DIR, f"{year}_{week}.pq")
 
 
 def transform_plays(plays: list[cfbd.Play]) -> pd.DataFrame:
-    CATEGORICAL = ["offense", "defense", "type", "quarter", "down"]
+    CATEGORICAL = ["offense", "defense", "type"]
+    UINT8 = [
+        "drive_number",
+        "play_number",
+        "offense_timeouts",
+        "defense_timeouts",
+        "quarter",
+        "down",
+        "yards_gained",
+        "yards_to_goal",
+    ]
     STRING = ["description"]
-    STRING = ["scoring"]
     DROP = ["mins", "secs", "home"]
+
+    IGNORE_TYPES = [
+        "End Period",
+        "Timeout",
+        "End of Half",
+        "End of Game",
+        "End of Regulation",
+    ]
 
     play_gen = (
         {
@@ -48,46 +67,54 @@ def transform_plays(plays: list[cfbd.Play]) -> pd.DataFrame:
 
     df = pd.DataFrame(play_gen, index=id_gen)
 
+    df[CATEGORICAL] = df[CATEGORICAL].astype("category")
+
     df["time"] = game_time_to_timestamp(df["quarter"], df["mins"], df["secs"])
     df["is_home_offense"] = df["offense"] == df["home"]
+    df.loc[df["offense_timeouts"] < 0, "offense_timeouts"] += 4
+    df.loc[df["defense_timeouts"] < 0, "defense_timeouts"] += 4
 
     df.drop(DROP, inplace=True, axis=1)
 
-    df[CATEGORICAL] = df[CATEGORICAL].astype("category")
+    df[CATEGORICAL] = df[CATEGORICAL].astype("category", copy=False, errors="ignore")
+    df[UINT8] = df[UINT8].astype("uint8", copy=False, errors="ignore")
+    df[STRING] = df[STRING].astype("string", copy=False, errors="ignore")
 
-    return df
+    return df[~df["type"].isin(IGNORE_TYPES)]
 
 
-def _try_read(year: int) -> pd.DataFrame:
+def _try_read(year: int, week: int) -> pd.DataFrame:
     try:
-        return read_file(year)
+        file = get_file_name(year, week)
+        return read_file(file)
     except FileNotFoundError:
-        return _fetch_from_api(year)
+        return _fetch_from_api(year, week)
 
 
-def _fetch_from_api(year: int) -> pd.DataFrame:
-    client = create_api_client()
-    play_client = cfbd.PlaysApi(client)
-    plays = play_client.get_plays(year, classification="fbs")
+def _fetch_from_api(year: int, week: int) -> pd.DataFrame:
+    client = create_play_client()
+    plays = client.get_plays(year, week, classification="fbs")
 
     data = transform_plays(plays)
 
-    file = get_file_name(year)
+    file = get_file_name(year, week)
     write_file(data, file)
 
     return data
 
 
-def get_drives(years: Iterable[int], use_cache: bool = True) -> pd.DataFrame:
+def get_plays(years: Iterable[int] = None, use_cache: bool = True) -> pd.DataFrame:
     years = [2023] if years is None else years
 
     if use_cache:
-        data = pd.concat(_try_read(year) for year in years)
+        data = pd.concat(_try_read(year, week) for year in years for week in WEEKS)
     else:
-        data = pd.concat((_fetch_from_api(year) for year in years))
+        data = pd.concat(
+            (_fetch_from_api(year, week) for year in years for week in WEEKS)
+        )
 
     return data
 
 
 if __name__ == "__main__":
-    drives = get_drives()
+    get_plays()

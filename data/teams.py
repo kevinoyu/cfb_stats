@@ -1,14 +1,13 @@
 import cfbd
 from os import path
 
-from api import create_api_client
+from api import create_teams_client
+from util import read_file, write_file
 from typing import NamedTuple
 
 import pandas as pd
 
-TEAMS_DIR = "teams"
-TEAM_FILE = "team.pq"
-TEAM_FILE_PATH = path.join(TEAMS_DIR, TEAM_FILE)
+TEAM_FILE_PATH = path.join(path.dirname(__file__), "teams", "team.pq")
 
 
 # transform swagger-returned team into internal team repr, stripping unnecessary fields for compactness
@@ -33,28 +32,21 @@ def transform_teams(teams: list[cfbd.Team]) -> pd.DataFrame:
     return df
 
 
-def read_teams() -> pd.DataFrame:
-    return pd.read_parquet(TEAM_FILE_PATH)
-
-
-def store_teams(teams: pd.DataFrame) -> None:
-    teams.to_parquet(TEAM_FILE_PATH, compression="snappy")
-
-
 def _fetch_from_api() -> pd.DataFrame:
-    client = create_api_client()
-    team_client = cfbd.TeamsApi(client)
-    teams = team_client.get_teams()
+    client = create_teams_client()
+    teams = client.get_teams()
     df = transform_teams(teams)
-    store_teams(df)
+    write_file(df, TEAM_FILE_PATH)
     return df
+
 
 def _try_read() -> pd.DataFrame:
     try:
-        return read_teams()
+        return read_file(TEAM_FILE_PATH)
     except FileNotFoundError:
         print("File not found - pulling from API")
         return _fetch_from_api()
+
 
 def get_teams(use_cache: bool = True) -> pd.DataFrame:
     if use_cache:

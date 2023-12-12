@@ -3,10 +3,10 @@ from os import path
 from collections.abc import Iterable
 import cfbd
 
-from api import create_api_client
+from api import create_drive_client
 from util import game_time_to_timestamp, read_file, write_file
 
-DRIVE_DIR = "drives"
+DRIVE_DIR = path.join(path.dirname(__file__), "plays")
 
 
 def get_file_name(year: int = 2023) -> str:
@@ -15,6 +15,7 @@ def get_file_name(year: int = 2023) -> str:
 
 def transform_drives(drives: list[cfbd.Drive]) -> pd.DataFrame:
     CATEGORICAL = ["offense", "defense", "result_str"]
+    UINT8 = ["start_quarter", "end_quarter", "start_yardline", "end_yardline"]
     DROP = ["start_minutes", "start_seconds", "end_minutes", "end_seconds"]
 
     drive_gen = (
@@ -53,8 +54,8 @@ def transform_drives(drives: list[cfbd.Drive]) -> pd.DataFrame:
     )
 
     df["duration"] = df["end_time"] - df["start_time"]
-
-    df[CATEGORICAL] = df[CATEGORICAL].astype("category")
+    df[CATEGORICAL] = df[CATEGORICAL].astype("category", copy=False, errors="ignore")
+    df[UINT8] = df[UINT8].astype("uint8", copy=False, errors="ignore")
 
     df.drop(DROP, inplace=True, axis=1)
 
@@ -70,9 +71,8 @@ def _try_read(year: int) -> pd.DataFrame:
 
 
 def _fetch_from_api(year: int) -> pd.DataFrame:
-    client = create_api_client()
-    drive_client = cfbd.DrivesApi(client)
-    drives = drive_client.get_drives(year, classification="fbs")
+    client = create_drive_client()
+    drives = client.get_drives(year, classification="fbs")
 
     data = transform_drives(drives)
 
