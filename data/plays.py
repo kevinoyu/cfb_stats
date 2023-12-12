@@ -2,9 +2,10 @@ import pandas as pd
 from os import path
 from collections.abc import Iterable
 import cfbd
+import argparse
 
-from api import create_play_client
-from util import game_time_to_timestamp, read_file, write_file
+from .api import create_play_client
+from .util import game_time_to_timestamp, read_file, write_file
 
 PLAY_DIR = path.join(path.dirname(__file__), "plays")
 
@@ -117,4 +118,8 @@ def get_plays(years: Iterable[int] = None, use_cache: bool = True) -> pd.DataFra
 
 
 if __name__ == "__main__":
-    get_plays()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("years", nargs="+", type=int)
+    args = parser.parse_args()
+
+    get_plays(years=args.years)

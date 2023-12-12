@@ -1,11 +1,10 @@
 import cfbd
 from os import path
-
-from api import create_teams_client
-from util import read_file, write_file
 from typing import NamedTuple
-
 import pandas as pd
+
+from .api import create_teams_client
+from .util import read_file, write_file
 
 TEAM_FILE_PATH = path.join(path.dirname(__file__), "teams", "team.pq")
 

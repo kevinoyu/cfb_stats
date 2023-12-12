@@ -16,16 +16,7 @@ def get_file_name(year: int = 2023) -> str:
 
 def transform_drives(drives: list[cfbd.Drive]) -> pd.DataFrame:
     CATEGORICAL = ["offense", "defense", "result_str"]
-    UINT8 = [
-        "start_quarter",
-        "end_quarter",
-        "start_yardline",
-        "end_yardline",
-        "yards",
-        "plays",
-        "yards_to_goal",
-        "number",
-    ]
+    UINT8 = ["start_quarter", "end_quarter", "start_yardline", "end_yardline"]
     DROP = ["start_minutes", "start_seconds", "end_minutes", "end_seconds"]
 
     drive_gen = (
@@ -35,11 +26,7 @@ def transform_drives(drives: list[cfbd.Drive]) -> pd.DataFrame:
             "defense": drive.defense,
             "start_yardline": drive.start_yardline,
             "end_yardline": drive.end_yardline,
-            "yards_to_goal": drive.start_yards_to_goal,
             "number": drive.drive_number,
-            "plays": drive.plays,
-            "yards": drive.yards,
-            "scoring": drive.scoring,
             "result_str": drive.drive_result,
             "result": drive.end_offense_score
             - drive.start_offense_score
@@ -109,7 +96,7 @@ def get_drives(years: Iterable[int], use_cache: bool = True) -> pd.DataFrame:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("years", nargs="+", type=int)
+    parser.add_argument("years", nargs="+")
     args = parser.parse_args()
 
-    drives = get_drives(years=args.years)
+    get_drives(years=args.years)
